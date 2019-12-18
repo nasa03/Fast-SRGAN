@@ -42,11 +42,16 @@ def train_step(model, x, y):
         fake_loss = tf.math.reduce_mean(tf.square(fake_loss), axis=[1, 2, 3])
         d_loss = tf.divide(tf.math.reduce_mean(valid_loss) + tf.math.reduce_mean(fake_loss), 2.0)
 
+    # Backprop on Discriminator
+    disc_grads = disc_tape.gradient(d_loss, model.discriminator.trainable_variables)
+    model.disc_optimizer.apply_gradients(zip(disc_grads, model.discriminator.trainable_variables))
+
     with tf.GradientTape() as gen_tape:
         # Generate fake image:
         fake_hr = model.generator(x)
 
         # Generate get predictions:
+        valid_predictions = model.discriminator(y)
         fake_predictions = model.discriminator(fake_hr)
 
         # Get generator losses:
@@ -62,10 +67,6 @@ def train_step(model, x, y):
     # Backprop on Generator
     gen_grads = gen_tape.gradient(perceptual_loss, model.generator.trainable_variables)
     model.gen_optimizer.apply_gradients(zip(gen_grads, model.generator.trainable_variables))
-
-    # Backprop on Discriminator
-    disc_grads = disc_tape.gradient(d_loss, model.discriminator.trainable_variables)
-    model.disc_optimizer.apply_gradients(zip(disc_grads, model.discriminator.trainable_variables))
 
     return tf.math.reduce_mean(valid_loss), tf.math.reduce_mean(fake_loss), adv_loss, content_loss, mse_loss
 
