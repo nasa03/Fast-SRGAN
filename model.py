@@ -235,6 +235,6 @@ class FastSRGAN(object):
         d7 = d_block(d6, self.df * 8)
         d8 = d_block(d7, self.df * 8, strides=2)
 
-        validity = keras.layers.Conv2D(1, kernel_size=1, strides=1, activation='sigmoid', padding='same')(d8)
+        validity = keras.layers.Conv2D(1, kernel_size=1, strides=1, padding='same')(d8)
 
         return keras.models.Model(d0, validity)
