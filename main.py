@@ -157,19 +157,15 @@ def main():
     # Define the directory for saving the SRGAN training tensorbaord summary.
     train_summary_writer = tf.summary.create_file_writer('logs/train')
 
-    # Distribute the model
-    mirrored_strategy = tf.distribute.MirroredStrategy()
+    # Initialize the GAN object.
+    gan = FastSRGAN(args)
 
-    with mirrored_strategy.scope():
-        # Initialize the GAN object.
-        gan = FastSRGAN(args)
+    # Run pre-training.
+    pretrain_generator(gan, ds, pretrain_summary_writer)
 
-        # Run pre-training.
-        pretrain_generator(gan, ds, pretrain_summary_writer)
-
-        # Run training.
-        for _ in range(args.epochs):
-            train(gan, ds, args.save_iter, train_summary_writer)
+    # Run training.
+    for _ in range(args.epochs):
+        train(gan, ds, args.save_iter, train_summary_writer)
 
 
 if __name__ == '__main__':
