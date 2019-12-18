@@ -40,7 +40,7 @@ def train_step(model, x, y):
         fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) + valid
         valid_loss = tf.math.reduce_mean(tf.square(valid_loss), axis=[1, 2, 3])
         fake_loss = tf.math.reduce_mean(tf.square(fake_loss), axis=[1, 2, 3])
-        d_loss = tf.div(tf.math.reduce_mean(valid_loss) + tf.math.reduce_mean(fake_loss), 2.0)
+        d_loss = tf.divide(tf.math.reduce_mean(valid_loss) + tf.math.reduce_mean(fake_loss), 2.0)
 
     with tf.GradientTape() as gen_tape:
         # Generate fake image:
@@ -54,7 +54,7 @@ def train_step(model, x, y):
         fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) - valid
         valid_loss = tf.math.reduce_mean(tf.square(valid_loss), axis=[1, 2, 3])
         fake_loss = tf.math.reduce_mean(tf.square(fake_loss), axis=[1, 2, 3])
-        adv_loss = tf.div(tf.math.reduce_mean(valid_loss) + tf.math.reduce_mean(fake_loss), 2.0)
+        adv_loss = tf.divide(tf.math.reduce_mean(valid_loss) + tf.math.reduce_mean(fake_loss), 2.0)
         content_loss = model.content_loss(y, fake_hr)
         mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
         perceptual_loss = content_loss + adv_loss + mse_loss
