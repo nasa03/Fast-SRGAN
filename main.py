@@ -67,7 +67,7 @@ def train_step(model, x, y):
     disc_grads = disc_tape.gradient(d_loss, model.discriminator.trainable_variables)
     model.disc_optimizer.apply_gradients(zip(disc_grads, model.discriminator.trainable_variables))
 
-    return valid_loss, fake_loss, adv_loss, content_loss, mse_loss
+    return tf.math.reduce_mean(valid_loss), tf.math.reduce_mean(fake_loss), adv_loss, content_loss, mse_loss
 
 
 def train(model, dataset, log_iter, writer):
