@@ -26,7 +26,6 @@ def train_step(model, x, y):
         d_loss: The mean loss of the discriminator.
     """
     valid = tf.ones((x.shape[0], 1))
-    fake = tf.zeros((x.shape[0], 1))
 
     with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
         # Get fake image:
@@ -37,14 +36,18 @@ def train_step(model, x, y):
         fake_predictions = model.discriminator(fake_hr)
 
         # calculate loss of the discriminator
-        valid_logit = valid_predictions - tf.math.reduce_mean(fake_predictions, axis=0, keepdims=True)
-        fake_logit = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True)
-        valid_loss = tf.reduce_mean(tf.keras.losses.binary_crossentropy(valid, valid_logit, from_logits=True))
-        fake_loss = tf.reduce_mean(tf.keras.losses.binary_crossentropy(fake, fake_logit, from_logits=True))
+        valid_loss = valid_predictions - tf.math.reduce_mean(fake_predictions, axis=0, keepdims=True) - valid
+        fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) + valid
+        valid_loss = tf.math.reduce_mean(tf.square(valid_loss))
+        fake_loss = tf.math.reduce_mean(tf.square(fake_loss))
         d_loss = tf.divide(valid_loss + fake_loss, 2.0)
 
         # Get generator losses:
-        adv_loss = tf.reduce_mean(tf.keras.losses.binary_crossentropy(valid, fake_logit, from_logits=True))
+        valid_loss = valid_predictions - tf.math.reduce_mean(fake_predictions, axis=0, keepdims=True) + valid
+        fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) - valid
+        valid_loss = tf.math.reduce_mean(tf.square(valid_loss))
+        fake_loss = tf.math.reduce_mean(tf.square(fake_loss))
+        adv_loss = tf.divide(valid_loss + fake_loss, 2.0)
         content_loss = model.content_loss(y, fake_hr)
         mse_loss = tf.reduce_mean(tf.reduce_mean(tf.square(fake_hr - y), axis=[1, 2, 3]))
         perceptual_loss = content_loss + adv_loss + mse_loss
