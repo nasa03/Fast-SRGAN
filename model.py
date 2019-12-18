@@ -27,15 +27,15 @@ class FastSRGAN(object):
         # Define a learning rate decay schedule.
         self.gen_schedule = keras.optimizers.schedules.ExponentialDecay(
             args.lr,
-            decay_steps=100000,
-            decay_rate=0.1,
+            decay_steps=50000,
+            decay_rate=0.5,
             staircase=True
         )
 
         self.disc_schedule = keras.optimizers.schedules.ExponentialDecay(
             args.lr * 5,  # TTUR - Two Time Scale Updates
-            decay_steps=100000,
-            decay_rate=0.1,
+            decay_steps=50000,
+            decay_rate=0.5,
             staircase=True
         )
 

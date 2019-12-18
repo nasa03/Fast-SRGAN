@@ -151,21 +151,25 @@ def main():
     # Create the tensorflow dataset.
     ds = DataLoader(args.image_dir, args.hr_size).dataset(args.batch_size)
 
-    # Initialize the GAN object.
-    gan = FastSRGAN(args)
-
     # Define the directory for saving pretrainig loss tensorboard summary.
     pretrain_summary_writer = tf.summary.create_file_writer('logs/pretrain')
-
-    # Run pre-training.
-    pretrain_generator(gan, ds, pretrain_summary_writer)
 
     # Define the directory for saving the SRGAN training tensorbaord summary.
     train_summary_writer = tf.summary.create_file_writer('logs/train')
 
-    # Run training.
-    for _ in range(args.epochs):
-        train(gan, ds, args.save_iter, train_summary_writer)
+    # Distribute the model
+    mirrored_strategy = tf.distribute.MirroredStrategy()
+
+    with mirrored_strategy.scope()
+        # Initialize the GAN object.
+        gan = FastSRGAN(args)
+
+        # Run pre-training.
+        pretrain_generator(gan, ds, pretrain_summary_writer)
+
+        # Run training.
+        for _ in range(args.epochs):
+            train(gan, ds, args.save_iter, train_summary_writer)
 
 
 if __name__ == '__main__':
