@@ -5,10 +5,10 @@ import tensorflow as tf
 import os
 
 parser = ArgumentParser()
-parser.add_argument('--image_dir', type=str, help='Path to high resolution image directory.')
+parser.add_argument('--image_dir', default='/Users/hasty/Datasets/div2k', type=str, help='Path to high resolution image directory.')
 parser.add_argument('--batch_size', default=8, type=int, help='Batch size for training.')
 parser.add_argument('--epochs', default=1, type=int, help='Number of epochs for training')
-parser.add_argument('--hr_size', default=384, type=int, help='Low resolution input size.')
+parser.add_argument('--hr_size', default=128, type=int, help='Low resolution input size.')
 parser.add_argument('--lr', default=1e-4, type=float, help='Learning rate for optimizers.')
 parser.add_argument('--save_iter', default=200, type=int,
                     help='The number of iterations to save the tensorboard summaries and models.')
@@ -64,28 +64,39 @@ def train_step(model, x, y):
     Returns:
         d_loss: The mean loss of the discriminator.
     """
-    # Label smoothing for better gradient flow
     valid = tf.ones((x.shape[0],) + model.disc_patch)
-    fake = tf.zeros((x.shape[0],) + model.disc_patch)
 
-    with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape:
-        # From low res. image generate high res. version
+    with tf.GradientTape() as disc_tape:
+        # Get fake image:
         fake_hr = model.generator(x)
 
-        # Train the discriminators (original images = real / generated = Fake)
-        valid_prediction = model.discriminator(y)
-        fake_prediction = model.discriminator(fake_hr)
+        # Get discriminator predictions:
+        valid_predictions = model.discriminator(y)
+        fake_predictions = model.discriminator(fake_hr)
 
-        # Generator loss
+        # calculate loss of the discriminator
+        valid_loss = valid_predictions - tf.math.reduce_mean(fake_predictions, axis=0, keepdims=True) - valid
+        fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) + valid
+        valid_loss = tf.math.reduce_mean(tf.square(valid_loss), axis=[1, 2, 3])
+        fake_loss = tf.math.reduce_mean(tf.square(fake_loss), axis=[1, 2, 3])
+        d_loss = tf.div(tf.math.reduce_mean(valid_loss) + tf.math.reduce_mean(fake_loss), 2.0)
+
+    with tf.GradientTape() as gen_tape:
+        # Generate fake image:
+        fake_hr = model.generator(x)
+
+        # Generate get predictions:
+        fake_predictions = model.discriminator(fake_hr)
+
+        # Get generator losses:
+        valid_loss = valid_predictions - tf.math.reduce_mean(fake_predictions, axis=0, keepdims=True) + valid
+        fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) - valid
+        valid_loss = tf.math.reduce_mean(tf.square(valid_loss), axis=[1, 2, 3])
+        fake_loss = tf.math.reduce_mean(tf.square(fake_loss), axis=[1, 2, 3])
+        adv_loss = tf.div(tf.math.reduce_mean(valid_loss) + tf.math.reduce_mean(fake_loss), 2.0)
         content_loss = model.content_loss(y, fake_hr)
-        adv_loss = 1e-3 * tf.keras.losses.BinaryCrossentropy()(valid, fake_prediction)
         mse_loss = tf.keras.losses.MeanSquaredError()(y, fake_hr)
         perceptual_loss = content_loss + adv_loss + mse_loss
-
-        # Discriminator loss
-        valid_loss = tf.keras.losses.BinaryCrossentropy()(valid, valid_prediction)
-        fake_loss = tf.keras.losses.BinaryCrossentropy()(fake, fake_prediction)
-        d_loss = tf.add(valid_loss, fake_loss)
 
     # Backprop on Generator
     gen_grads = gen_tape.gradient(perceptual_loss, model.generator.trainable_variables)

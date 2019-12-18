@@ -227,13 +227,13 @@ class FastSRGAN(object):
         d0 = keras.layers.Input(shape=self.hr_shape)
 
         d1 = d_block(d0, self.df, bn=False)
-        d2 = d_block(d1, self.df, strides=2)
-        d3 = d_block(d2, self.df)
-        d4 = d_block(d3, self.df, strides=2)
-        d5 = d_block(d4, self.df * 2)
-        d6 = d_block(d5, self.df * 2, strides=2)
-        d7 = d_block(d6, self.df * 2)
-        d8 = d_block(d7, self.df * 2, strides=2)
+        d2 = d_block(d1, self.df * 2, strides=2)
+        d3 = d_block(d2, self.df * 2)
+        d4 = d_block(d3, self.df * 4, strides=2)
+        d5 = d_block(d4, self.df * 4)
+        d6 = d_block(d5, self.df * 8, strides=2)
+        d7 = d_block(d6, self.df * 8)
+        d8 = d_block(d7, self.df * 8, strides=2)
 
         validity = keras.layers.Conv2D(1, kernel_size=1, strides=1, activation='sigmoid', padding='same')(d8)
 
