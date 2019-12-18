@@ -27,7 +27,7 @@ def train_step(model, x, y):
     """
     valid = tf.ones((x.shape[0], 1))
 
-    with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
+    with tf.GradientTape() as gen_tape:
         # Get fake image:
         fake_hr = model.generator(x)
 
@@ -45,21 +45,40 @@ def train_step(model, x, y):
         mse_loss = tf.reduce_mean(tf.reduce_mean(tf.square(fake_hr - y), axis=[1, 2, 3]))
         perceptual_loss = content_loss + adv_loss + mse_loss
 
-        # calculate loss of the discriminator
-        valid_loss = valid_predictions - tf.math.reduce_mean(fake_predictions, axis=0, keepdims=True) - valid
-        fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) + valid
-        valid_loss = tf.math.reduce_mean(tf.square(valid_loss)) * 0.5
-        fake_loss = tf.math.reduce_mean(tf.square(fake_loss)) * 0.5
-
-    # Backprop on Discriminator
-    disc_grads_valid = disc_tape.gradient(valid_loss, model.discriminator.trainable_variables)
-    disc_grads_fake = disc_tape.gradient(fake_loss, model.discriminator.trainable_variables)
-    model.disc_optimizer.apply_gradients(zip(disc_grads_valid, model.discriminator.trainable_variables))
-    model.disc_optimizer.apply_gradients(zip(disc_grads_fake, model.discriminator.trainable_variables))
-
     # Backprop on Generator
     gen_grads = gen_tape.gradient(perceptual_loss, model.generator.trainable_variables)
     model.gen_optimizer.apply_gradients(zip(gen_grads, model.generator.trainable_variables))
+
+    with tf.GradientTape() as disc_tape:
+        # Get fake image:
+        fake_hr = model.generator(x)
+
+        # Get discriminator predictions:
+        fake_predictions = model.discriminator(fake_hr)
+        valid_predictions = model.discriminator(y)
+
+        # calculate loss of the discriminator
+        fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) + valid
+        fake_loss = tf.math.reduce_mean(tf.square(fake_loss)) * 0.5
+
+    disc_grads_fake = disc_tape.gradient(fake_loss, model.discriminator.trainable_variables)
+    model.disc_optimizer.apply_gradients(zip(disc_grads_fake, model.discriminator.trainable_variables))
+
+    with tf.GradientTape() as disc_tape:
+        # Get fake image:
+        fake_hr = model.generator(x)
+
+        # Get discriminator predictions:
+        fake_predictions = model.discriminator(fake_hr)
+        valid_predictions = model.discriminator(y)
+
+        # Calculate loss of discriminator
+        valid_loss = valid_predictions - tf.math.reduce_mean(fake_predictions, axis=0, keepdims=True) - valid
+        valid_loss = tf.math.reduce_mean(tf.square(valid_loss)) * 0.5
+
+    # Backprop on Discriminator
+    disc_grads_valid = disc_tape.gradient(valid_loss, model.discriminator.trainable_variables)
+    model.disc_optimizer.apply_gradients(zip(disc_grads_valid, model.discriminator.trainable_variables))
 
     return valid_loss, fake_loss, adv_loss, content_loss, mse_loss
 
