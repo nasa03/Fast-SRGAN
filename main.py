@@ -25,8 +25,8 @@ def train_step(model, x, y):
     Returns:
         d_loss: The mean loss of the discriminator.
     """
-    valid = tf.ones((x.shape[0],))
-    fake = tf.zeros((x.shape[0],))
+    valid = tf.ones((x.shape[0], 1))
+    fake = tf.zeros((x.shape[0], 1))
 
     with tf.GradientTape() as disc_tape, tf.GradientTape() as gen_tape:
         # Get fake image:
