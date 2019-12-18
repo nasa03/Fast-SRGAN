@@ -25,7 +25,7 @@ def pretrain_step(model, x, y):
     """
     with tf.GradientTape() as tape:
         fake_hr = model.generator(x)
-        loss_mse = tf.keras.losses.MeanSquaredError()(y, fake_hr)
+        loss_mse = tf.math.reduce_mean(tf.math.reduce_mean(tf.square(y - fake_hr), axis=[1, 2, 3]))
 
     grads = tape.gradient(loss_mse, model.generator.trainable_variables)
     model.gen_optimizer.apply_gradients(zip(grads, model.generator.trainable_variables))
@@ -160,7 +160,7 @@ def main():
     # Distribute the model
     mirrored_strategy = tf.distribute.MirroredStrategy()
 
-    with mirrored_strategy.scope()
+    with mirrored_strategy.scope():
         # Initialize the GAN object.
         gan = FastSRGAN(args)
 
