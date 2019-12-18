@@ -33,7 +33,7 @@ class FastSRGAN(object):
         )
 
         self.disc_schedule = keras.optimizers.schedules.ExponentialDecay(
-            args.lr * 5,  # TTUR - Two Time Scale Updates
+            args.lr,  # TTUR - Two Time Scale Updates
             decay_steps=50000,
             decay_rate=0.5,
             staircase=True
@@ -67,7 +67,8 @@ class FastSRGAN(object):
         hr = keras.applications.vgg19.preprocess_input(((hr + 1.0) * 255) / 2.0)
         sr_features = self.vgg(sr) / 12.75
         hr_features = self.vgg(hr) / 12.75
-        return tf.keras.losses.MeanSquaredError()(hr_features, sr_features)
+        loss = tf.math.reduce_mean(tf.math.reduce_mean(tf.math.square(sr_features - hr_features), axis=[1, 2, 3]))
+        return loss
 
     def build_vgg(self):
         """
@@ -233,8 +234,11 @@ class FastSRGAN(object):
         d5 = d_block(d4, self.df * 4)
         d6 = d_block(d5, self.df * 8, strides=2)
         d7 = d_block(d6, self.df * 8)
-        d8 = d_block(d7, self.df * 8, strides=2)
 
-        validity = keras.layers.Conv2D(1, kernel_size=1, strides=1, padding='same')(d8)
+        # Flatten
+        d8 = keras.layers.Flatten()(d7)
+        d9 = keras.layers.Dense(1024)(d8)
+        d10 = keras.layers.LeakyReLU(alpha=0.2)(d9)
+        validity = keras.layers.Dense(1)(d10)
 
         return keras.models.Model(d0, validity)
