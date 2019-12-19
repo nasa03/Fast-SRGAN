@@ -22,7 +22,7 @@ class FastSRGAN(object):
         self.iterations = 0
 
         # Number of inverted residual blocks in the mobilenet generator
-        self.n_residual_blocks = 6
+        self.n_residual_blocks = 16
 
         # Define a learning rate decay schedule.
         self.gen_schedule = keras.optimizers.schedules.ExponentialDecay(
@@ -52,7 +52,7 @@ class FastSRGAN(object):
         self.disc_patch = (patch, patch, 1)
 
         # Number of filters in the first layer of G and D
-        self.gf = 32  # Realtime Image Enhancement GAN Galteri et al.
+        self.gf = 64  # Realtime Image Enhancement GAN Galteri et al.
         self.df = 32
 
         # Build and compile the discriminator
@@ -90,79 +90,19 @@ class FastSRGAN(object):
         """Build the generator that will do the Super Resolution task.
         Based on the Mobilenet design. Idea from Galteri et al."""
 
-        def _make_divisible(v, divisor, min_value=None):
-                if min_value is None:
-                    min_value = divisor
-                new_v = max(min_value, int(v + divisor / 2) // divisor * divisor)
-                # Make sure that round down does not go down by more than 10%.
-                if new_v < 0.9 * v:
-                    new_v += divisor
-                return new_v
-
-        def residual_block(inputs, filters, block_id, expansion=6, stride=1, alpha=1.0):
+        def residual_block(inputs, filters):
             """Inverted Residual block that uses depth wise convolutions for parameter efficiency.
             Args:
                 inputs: The input feature map.
                 filters: Number of filters in each convolution in the block.
-                block_id: An integer specifier for the id of the block in the graph.
-                expansion: Channel expansion factor.
-                stride: The stride of the convolution.
-                alpha: Depth expansion factor.
             Returns:
                 x: The output of the inverted residual block.
             """
-            channel_axis = 1 if keras.backend.image_data_format() == 'channels_first' else -1
+            x = keras.layers.Conv2D(filters, kernel_size=3, strides=1, padding='same')(inputs)
+            x = keras.layers.BatchNormalization()(x)
+            x = keras.layers.PReLU(shared_axes=[1, 2])(x)
+            x = keras.layers.Add()([x, inputs])(x)
 
-            in_channels = keras.backend.int_shape(inputs)[channel_axis]
-            pointwise_conv_filters = int(filters * alpha)
-            pointwise_filters = _make_divisible(pointwise_conv_filters, 8)
-            x = inputs
-            prefix = 'block_{}_'.format(block_id)
-
-            if block_id:
-                # Expand
-                x = keras.layers.Conv2D(expansion * in_channels,
-                                        kernel_size=1,
-                                        padding='same',
-                                        use_bias=True,
-                                        activation=None,
-                                        name=prefix + 'expand')(x)
-                x = keras.layers.BatchNormalization(axis=channel_axis,
-                                                    epsilon=1e-3,
-                                                    momentum=0.999,
-                                                    name=prefix + 'expand_BN')(x)
-                x = keras.layers.Activation('relu', name=prefix + 'expand_relu')(x)
-            else:
-                prefix = 'expanded_conv_'
-
-            # Depthwise
-            x = keras.layers.DepthwiseConv2D(kernel_size=3,
-                                             strides=stride,
-                                             activation=None,
-                                             use_bias=True,
-                                             padding='same' if stride == 1 else 'valid',
-                                             name=prefix + 'depthwise')(x)
-            x = keras.layers.BatchNormalization(axis=channel_axis,
-                                                epsilon=1e-3,
-                                                momentum=0.999,
-                                                name=prefix + 'depthwise_BN')(x)
-
-            x = keras.layers.Activation('relu', name=prefix + 'depthwise_relu')(x)
-
-            # Project
-            x = keras.layers.Conv2D(pointwise_filters,
-                                    kernel_size=1,
-                                    padding='same',
-                                    use_bias=True,
-                                    activation=None,
-                                    name=prefix + 'project')(x)
-            x = keras.layers.BatchNormalization(axis=channel_axis,
-                                                epsilon=1e-3,
-                                                momentum=0.999,
-                                                name=prefix + 'project_BN')(x)
-
-            if in_channels == pointwise_filters and stride == 1:
-                return keras.layers.Add(name=prefix + 'add')([inputs, x])
             return x
 
         def deconv2d(u):
@@ -200,6 +140,8 @@ class FastSRGAN(object):
         u1 = keras.layers.Conv2D(self.gf, kernel_size=3, strides=1, padding='same')(u1)
         u1 = keras.layers.PReLU(shared_axes=[1, 2])(u1)
         u2 = deconv2d(u1)
+        u2 = keras.layers.Conv2D(self.gf, kernel_size=3, strides=1, padding='same')(u2)
+        u2 = keras.layers.PReLU(shared_axes=[1, 2])(u2)
 
         # Generate high resolution output
         gen_hr = keras.layers.Conv2D(3, kernel_size=3, strides=1, padding='same', activation='tanh')(u2)
