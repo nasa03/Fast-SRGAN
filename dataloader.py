@@ -70,33 +70,18 @@ class DataLoader(object):
             high_res: A tf tensor of the high res image.
         """
 
-        low_res = tf.image.resize(high_res, 
+        low_res = tf.image.resize(high_res * 255.0,
                                   [self.image_size // 4, self.image_size // 4], 
                                   method='bicubic')
+        low_res = low_res / 255.0
 
         return low_res, high_res
 
-    def _rescale(self, low_res, high_res):
-        """
-        Function that rescales the pixel values to the -1 to 1 range.
-        For use with the generator output tanh function.
-        Args:
-            low_res: The tf tensor of the low res image.
-            high_res: The tf tensor of the high res image.
-        Returns:
-            low_res: The tf tensor of the low res image, rescaled.
-            high_res: the tf tensor of the high res image, rescaled.
-        """
-        high_res = high_res * 2.0 - 1.0
-
-        return low_res, high_res
-
-    def dataset(self, batch_size, threads=4):
+    def dataset(self, batch_size):
         """
         Returns a tf dataset object with specified mappings.
         Args:
             batch_size: Int, The number of elements in a batch returned by the dataset.
-            threads: Int, CPU threads to use for multi-threaded operation.
         Returns:
             dataset: A tf dataset object.
         """
@@ -112,9 +97,6 @@ class DataLoader(object):
 
         # Generate low resolution by downsampling crop.
         dataset = dataset.map(self._high_low_res_pairs, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-
-        # Rescale the values in the input
-        dataset = dataset.map(self._rescale, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
         # Batch the input, drop remainder to get a defined batch size.
         # Prefetch the data for optimal GPU utilization.

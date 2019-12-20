@@ -106,8 +106,8 @@ def train(model, dataset, log_iter, writer):
                 tf.summary.scalar('Discriminator Loss Real', dReal, step=model.iterations)
                 tf.summary.scalar('Discriminator Loss Fake', dFake, step=model.iterations)
                 tf.summary.image('Low Res', tf.cast(255 * x, tf.uint8), step=model.iterations)
-                tf.summary.image('High Res', tf.cast(255 * (y + 1.0) / 2.0, tf.uint8), step=model.iterations)
-                tf.summary.image('Generated', tf.cast(255 * (model.generator.predict(x) + 1.0) / 2.0, tf.uint8),
+                tf.summary.image('High Res', tf.cast(255 * y, tf.uint8), step=model.iterations)
+                tf.summary.image('Generated', tf.cast(255 * model.generator.predict(x), tf.uint8),
                                  step=model.iterations)
                 model.generator.save('models/generator.h5')
                 model.discriminator.save('models/discriminator.h5')

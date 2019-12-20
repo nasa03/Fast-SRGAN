@@ -63,8 +63,8 @@ class FastSRGAN(object):
 
     @tf.function
     def content_loss(self, hr, sr):
-        sr = keras.applications.vgg19.preprocess_input(((sr + 1.0) * 255) / 2.0)
-        hr = keras.applications.vgg19.preprocess_input(((hr + 1.0) * 255) / 2.0)
+        sr = keras.applications.vgg19.preprocess_input(sr * 255)
+        hr = keras.applications.vgg19.preprocess_input(hr * 255)
         sr_features = self.vgg(sr)
         hr_features = self.vgg(hr)
         loss = tf.math.reduce_mean(tf.math.reduce_mean(tf.math.square(sr_features - hr_features), axis=[1, 2, 3]))
@@ -159,9 +159,6 @@ class FastSRGAN(object):
 
         # Add image and residual:
         gen_hr = keras.layers.Add()([residual, up_image])
-
-        # Pass through tanh
-        gen_hr = keras.layers.Activation('tanh')(gen_hr)
 
         return keras.models.Model(img_lr, gen_hr)
 
