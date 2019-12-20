@@ -67,7 +67,7 @@ class FastSRGAN(object):
         hr = keras.applications.vgg19.preprocess_input(hr * 255)
         sr_features = self.vgg(sr)
         hr_features = self.vgg(hr)
-        loss = tf.math.reduce_mean(tf.math.reduce_mean(tf.math.square(sr_features - hr_features), axis=[1, 2, 3]))
+        loss = tf.math.reduce_mean(tf.math.reduce_mean(tf.math.abs(sr_features - hr_features), axis=[1, 2, 3]))
         return loss
 
     def build_vgg(self):
@@ -98,11 +98,11 @@ class FastSRGAN(object):
             Returns:
                 x: The output of the inverted residual block.
             """
-            x = keras.layers.Conv2D(filters, kernel_size=1, strides=1, padding='same')(inputs)
+            x = keras.layers.Conv2D(filters * 6, kernel_size=1, strides=1, padding='same')(inputs)
             x = keras.layers.BatchNormalization()(x)
             x = keras.layers.PReLU(shared_axes=[1, 2])(x)
 
-            x = keras.layers.DepthwiseConv2D(depth_multiplier=6, kernel_size=3, strides=1, padding='same')(x)
+            x = keras.layers.DepthwiseConv2D(depth_multiplier=1, kernel_size=3, strides=1, padding='same')(x)
             x = keras.layers.BatchNormalization()(x)
             x = keras.layers.PReLU(shared_axes=[1, 2])(x)
 
@@ -152,7 +152,7 @@ class FastSRGAN(object):
         u2 = keras.layers.PReLU(shared_axes=[1, 2])(u2)
 
         # upsample the input image:
-        up_image = keras.layers.UpSampling2D(size=4, interpolation='nearest')(img_lr)
+        up_image = keras.layers.UpSampling2D(size=4, interpolation='bilinear')(img_lr)
 
         # Generate high resolution residual
         residual = keras.layers.Conv2D(3, kernel_size=3, strides=1, padding='same', activation=None)(u2)

@@ -40,9 +40,9 @@ def train_step(model, x, y):
         fake_loss = fake_predictions - tf.math.reduce_mean(valid_predictions, axis=0, keepdims=True) - valid
         valid_loss = tf.math.reduce_mean(tf.square(valid_loss))
         fake_loss = tf.math.reduce_mean(tf.square(fake_loss))
-        adv_loss = 1e-1 * tf.divide(valid_loss + fake_loss, 2.0)
+        adv_loss = 5e-3 * tf.divide(valid_loss + fake_loss, 2.0)
         content_loss = model.content_loss(y, fake_hr)
-        mse_loss = tf.reduce_mean(tf.reduce_mean(tf.square(fake_hr - y), axis=[1, 2, 3]))
+        mse_loss = 1e-2 * tf.reduce_mean(tf.reduce_mean(tf.math.abs(fake_hr - y), axis=[1, 2, 3]))
         perceptual_loss = content_loss + adv_loss + mse_loss
 
     # Backprop on Generator
