@@ -22,12 +22,12 @@ class FastSRGAN(object):
         self.iterations = 0
 
         # Number of inverted residual blocks in the mobilenet generator
-        self.n_residual_blocks = 16
+        self.n_residual_blocks = 12
 
         # Define a learning rate decay schedule.
         self.gen_schedule = keras.optimizers.schedules.ExponentialDecay(
             args.lr,
-            decay_steps=50000,
+            decay_steps=100000,
             decay_rate=0.5,
             staircase=True
         )
@@ -52,7 +52,7 @@ class FastSRGAN(object):
         self.disc_patch = (patch, patch, 1)
 
         # Number of filters in the first layer of G and D
-        self.gf = 64  # Realtime Image Enhancement GAN Galteri et al.
+        self.gf = 32  # Realtime Image Enhancement GAN Galteri et al.
         self.df = 32
 
         # Build and compile the discriminator
@@ -65,8 +65,8 @@ class FastSRGAN(object):
     def content_loss(self, hr, sr):
         sr = keras.applications.vgg19.preprocess_input(((sr + 1.0) * 255) / 2.0)
         hr = keras.applications.vgg19.preprocess_input(((hr + 1.0) * 255) / 2.0)
-        sr_features = self.vgg(sr) / 12.75
-        hr_features = self.vgg(hr) / 12.75
+        sr_features = self.vgg(sr)
+        hr_features = self.vgg(hr)
         loss = tf.math.reduce_mean(tf.math.reduce_mean(tf.math.square(sr_features - hr_features), axis=[1, 2, 3]))
         return loss
 
@@ -98,22 +98,31 @@ class FastSRGAN(object):
             Returns:
                 x: The output of the inverted residual block.
             """
-            x = keras.layers.Conv2D(filters, kernel_size=3, strides=1, padding='same')(inputs)
+            x = keras.layers.Conv2D(filters, kernel_size=1, strides=1, padding='same')(inputs)
             x = keras.layers.BatchNormalization()(x)
             x = keras.layers.PReLU(shared_axes=[1, 2])(x)
-            x = keras.layers.Add()([x, inputs])(x)
+
+            x = keras.layers.DepthwiseConv2D(depth_multiplier=6, kernel_size=3, strides=1, padding='same')(x)
+            x = keras.layers.BatchNormalization()(x)
+            x = keras.layers.PReLU(shared_axes=[1, 2])(x)
+
+            x = keras.layers.Conv2D(filters, kernel_size=1, strides=1, padding='same')(x)
+            x = keras.layers.BatchNormalization()(x)
+
+            x = keras.layers.Add()([x, inputs])
 
             return x
 
-        def deconv2d(u):
+        def deconv2d(u, filters):
             """Upsampling layer to increase height and width of the input.
             Uses PixelShuffle for upsampling.
             Args:
                 u: The input tensor to upsample.
+                filters: The numnber of filters.
             Returns:
                 u: Upsampled input by a factor of 2.
             """
-            u = keras.layers.UpSampling2D(size=2, interpolation='nearest')(u)
+            u = keras.layers.Conv2DTranspose(filters, kernel_size=3, strides=2, padding='same')(u)
             u = keras.layers.PReLU(shared_axes=[1, 2])(u)
             return u
 
@@ -126,25 +135,33 @@ class FastSRGAN(object):
         c1 = keras.layers.PReLU(shared_axes=[1, 2])(c1)
 
         # Propogate through residual blocks
-        r = residual_block(c1, self.gf, 0)
+        r = residual_block(c1, self.gf)
         for idx in range(1, self.n_residual_blocks):
-            r = residual_block(r, self.gf, idx)
+            r = residual_block(r, self.gf)
 
         # Post-residual block
         c2 = keras.layers.Conv2D(self.gf, kernel_size=3, strides=1, padding='same')(r)
         c2 = keras.layers.BatchNormalization()(c2)
-        c2 = keras.layers.Add()([c2, c1])
         
         # Upsampling
-        u1 = deconv2d(c2)
-        u1 = keras.layers.Conv2D(self.gf, kernel_size=3, strides=1, padding='same')(u1)
-        u1 = keras.layers.PReLU(shared_axes=[1, 2])(u1)
-        u2 = deconv2d(u1)
+        u1 = deconv2d(c2, self.gf)
+        u2 = deconv2d(u1, self.gf)
+
+        # Post upscaling convolution
         u2 = keras.layers.Conv2D(self.gf, kernel_size=3, strides=1, padding='same')(u2)
         u2 = keras.layers.PReLU(shared_axes=[1, 2])(u2)
 
-        # Generate high resolution output
-        gen_hr = keras.layers.Conv2D(3, kernel_size=3, strides=1, padding='same', activation='tanh')(u2)
+        # upsample the input image:
+        up_image = keras.layers.UpSampling2D(size=4, interpolation='nearest')(img_lr)
+
+        # Generate high resolution residual
+        residual = keras.layers.Conv2D(3, kernel_size=3, strides=1, padding='same', activation=None)(u2)
+
+        # Add image and residual:
+        gen_hr = keras.layers.Add()([residual, up_image])
+
+        # Pass through tanh
+        gen_hr = keras.layers.Activation('tanh')(gen_hr)
 
         return keras.models.Model(img_lr, gen_hr)
 
